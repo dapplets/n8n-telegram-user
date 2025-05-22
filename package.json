@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Ni-2/n8n-telergam-user"
+    "url": "https://github.com/dapplets/n8n-telergam-user"
   },
   "engines": {
     "node": ">=20.15"
@@ -33,12 +33,9 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/ExampleCredentialsApi.credentials.js",
-      "dist/credentials/HttpBinApi.credentials.js"
+      "dist/credentials/TelegramUserApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/ExampleNode/ExampleNode.node.js",
-      "dist/nodes/HttpBin/HttpBin.node.js",
       "dist/nodes/TelergamUser/TelergamUser.node.js"
     ]
   },

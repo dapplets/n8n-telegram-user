@@ -14,7 +14,7 @@ export class TelergamUser implements INodeType {
 		name: 'telergamUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 4,
+		version: 5,
 		description: 'Read Telergam user channels',
 		defaults: {
 			name: 'Telergam User',

@@ -8,7 +8,7 @@ import {
 export class TelegramUserApi implements ICredentialType {
 	name = 'telegramUserCredentialsApi';
 	displayName = 'Telegram User Credentials API';
-	documentationUrl = 'https://github.com/Ni-2/n8n-telergam-user';
+	documentationUrl = 'https://github.com/dapplets/n8n-telergam-user';
 	properties: INodeProperties[] = [
 		{
 			displayName: 'Session',
