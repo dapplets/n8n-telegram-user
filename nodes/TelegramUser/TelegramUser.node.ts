@@ -8,16 +8,16 @@ import { NodeConnectionType, NodeOperationError } from 'n8n-workflow';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 
-export class TelergamUser implements INodeType {
+export class TelegramUser implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'Telergam User',
-		name: 'telergamUser',
+		displayName: 'Telegram User',
+		name: 'telegramUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 5,
-		description: 'Read Telergam user channels',
+		version: 1,
+		description: 'Read Telegram user channels',
 		defaults: {
-			name: 'Telergam User',
+			name: 'Telegram User',
 		},
 		inputs: [NodeConnectionType.Main],
 		outputs: [NodeConnectionType.Main],

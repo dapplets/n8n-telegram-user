@@ -1,7 +1,7 @@
 {
   "name": "@dapplets/n8n-nodes-telegram-user",
-  "version": "0.1.2",
-  "description": "Telergam user node",
+  "version": "0.1.3",
+  "description": "Telegram user node",
   "keywords": [
     "n8n-community-node-package"
   ],
@@ -36,7 +36,7 @@
       "dist/credentials/TelegramUserApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/TelergamUser/TelergamUser.node.js"
+      "dist/nodes/TelegramUser/TelegramUser.node.js"
     ]
   },
   "devDependencies": {
