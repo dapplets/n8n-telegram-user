@@ -7,6 +7,43 @@ import type {
 import { NodeConnectionType, NodeOperationError } from 'n8n-workflow';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
+import { Dialog } from 'telegram/tl/custom/dialog';
+
+const getMessages = async (client: TelegramClient, dialog: Dialog) => {
+	let messages = null;
+	if (dialog.entity?.className === 'Channel' || dialog.entity?.className === 'Chat') {
+		let getMore = true;
+		while (getMore) {
+			const rawMessages = await client.getMessages(dialog.entity, {
+				limit: 10,
+				// offsetDate: Math.trunc((Date.now() - 1000 * 60 * 60) / 1000),
+			});
+			if (!rawMessages.length) break;
+			if (
+				rawMessages[rawMessages.length - 1].date < Math.trunc((Date.now() - 1000 * 60 * 60) / 1000)
+			) {
+				getMore = false;
+			}
+			messages = rawMessages
+				.filter((m) => m.date >= Math.trunc((Date.now() - 1000 * 60 * 60) / 1000))
+				.map((m) => ({
+					id: m.id,
+					text: m.message,
+					date: m.date,
+					source: dialog.title,
+					sourceId: dialog.id,
+					sourceType: dialog.isChannel
+						? 'channel'
+						: dialog.isGroup
+							? 'group'
+							: dialog.isUser
+								? 'user'
+								: 'unknown',
+				}));
+		}
+	}
+	return messages;
+};
 
 export class TelegramUser implements INodeType {
 	description: INodeTypeDescription = {
@@ -14,7 +51,7 @@ export class TelegramUser implements INodeType {
 		name: 'telegramUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 2,
+		version: 3,
 		description: 'Read Telegram user channels',
 		defaults: {
 			name: 'Telegram User',
@@ -28,7 +65,15 @@ export class TelegramUser implements INodeType {
 				testedBy: 'testCredentials',
 			},
 		],
-		properties: [],
+		properties: [
+			{
+				displayName: 'Channel Name',
+				name: 'channelName',
+				type: 'string',
+				default: '',
+				description: 'Channel Name to get messages from',
+			},
+		],
 	};
 
 	async testCredentials(credentials: { session: string; apiId: number; apiHash: string }) {
@@ -48,10 +93,12 @@ export class TelegramUser implements INodeType {
 		}
 
 		let item: INodeExecutionData;
+		let channelName: string;
 
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {
 				item = items[itemIndex];
+				channelName = this.getNodeParameter('channelName', itemIndex, '') as string;
 
 				const stringSession = new StringSession(creds.session as string);
 				const client = new TelegramClient(
@@ -66,59 +113,26 @@ export class TelegramUser implements INodeType {
 				const dialogs = await client.getDialogs({});
 
 				const result = [];
-				for (let i = 0; i < dialogs.length; i++) {
-					const dialog = dialogs[i];
-					let messages = null;
-					if (dialog.entity?.className === 'Channel' || dialog.entity?.className === 'Chat') {
-						let getMore = true;
-						while (getMore) {
-							const rawMessages = await client.getMessages(dialog.entity, {
-								limit: 10,
-								// offsetDate: Math.trunc((Date.now() - 1000 * 60 * 60) / 1000),
-							});
-							if (!rawMessages.length) break;
-							if (
-								rawMessages[rawMessages.length - 1].date <
-								Math.trunc((Date.now() - 1000 * 60 * 60) / 1000)
-							) {
-								getMore = false;
-							}
-							messages = rawMessages
-								.filter((m) => m.date >= Math.trunc((Date.now() - 1000 * 60 * 60) / 1000))
-								.map((m) => ({
-									id: m.id,
-									text: m.message,
-									date: m.date,
-									source: dialog.title,
-									sourceType: dialog.isChannel
-										? 'channel'
-										: dialog.isGroup
-											? 'group'
-											: dialog.isUser
-												? 'user'
-												: 'unknown',
-								}));
-						}
+
+				if (channelName) {
+					const dialog = dialogs.find((d) => d.title === channelName);
+					if (!dialog) {
+						throw new NodeOperationError(this.getNode(), 'Channel not found');
 					}
-					// result.push({
-					// 	id: dialog.id,
-					// 	title: dialog.title,
-					// 	name: dialog.name,
-					// 	username: dialog.isChannel ? (dialog.entity as any)?.username : null,
-					// 	type: dialog.isChannel
-					// 		? 'channel'
-					// 		: dialog.isGroup
-					// 			? 'group'
-					// 			: dialog.isUser
-					// 				? 'user'
-					// 				: 'unknown',
-					// 	unreadCount: dialog.unreadCount,
-					// 	unreadMentionsCount: dialog.unreadMentionsCount,
-					// 	messages,
-					// });
+					const messages = await getMessages(client, dialog);
 					if (messages) {
 						for (const m of messages) {
 							result.push(m);
+						}
+					}
+				} else {
+					for (let i = 0; i < dialogs.length; i++) {
+						const dialog = dialogs[i];
+						const messages = await getMessages(client, dialog);
+						if (messages) {
+							for (const m of messages) {
+								result.push(m);
+							}
 						}
 					}
 				}

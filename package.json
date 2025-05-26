@@ -1,6 +1,6 @@
 {
   "name": "@dapplets/n8n-nodes-telegram-user",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Telegram user node",
   "keywords": [
     "n8n-community-node-package"
