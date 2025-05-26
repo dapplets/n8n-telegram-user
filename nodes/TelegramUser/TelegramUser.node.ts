@@ -26,12 +26,14 @@ const getMessages = async (client: TelegramClient, dialog: Dialog) => {
 			}
 			messages = rawMessages
 				.filter((m) => m.date >= Math.trunc((Date.now() - 1000 * 60 * 60) / 1000))
+				.filter((m) => m.message)
 				.map((m) => ({
 					id: m.id,
 					text: m.message,
 					date: m.date,
 					source: dialog.title,
 					sourceId: dialog.id,
+					sourceName: (dialog.entity as any)?.username,
 					sourceType: dialog.isChannel
 						? 'channel'
 						: dialog.isGroup
@@ -39,6 +41,7 @@ const getMessages = async (client: TelegramClient, dialog: Dialog) => {
 							: dialog.isUser
 								? 'user'
 								: 'unknown',
+					privateChannel: !!(dialog.entity?.className === 'Channel' && !dialog.entity.username),
 				}));
 		}
 	}
@@ -51,7 +54,7 @@ export class TelegramUser implements INodeType {
 		name: 'telegramUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 3,
+		version: 4,
 		description: 'Read Telegram user channels',
 		defaults: {
 			name: 'Telegram User',
