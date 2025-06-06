@@ -9,7 +9,15 @@ import { Api, TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { Dialog } from 'telegram/tl/custom/dialog';
 
-const getMessages = async (client: TelegramClient, dialog: Dialog) => {
+const getMessages = async ({
+	client,
+	dialog,
+	isNew,
+}: {
+	client: TelegramClient;
+	dialog: Dialog;
+	isNew?: boolean;
+}) => {
 	let messages = null;
 	if (dialog.entity?.className === 'Channel' || dialog.entity?.className === 'Chat') {
 		let getMore = true;
@@ -25,7 +33,7 @@ const getMessages = async (client: TelegramClient, dialog: Dialog) => {
 				getMore = false;
 			}
 			messages = rawMessages
-				.filter((m) => m.date >= Math.trunc((Date.now() - 1000 * 60 * 60) / 1000))
+				.filter((m) => isNew || m.date >= Math.trunc((Date.now() - 1000 * 60 * 60) / 1000))
 				.filter((m) => m.message)
 				.map((m) => ({
 					id: m.id,
@@ -54,7 +62,7 @@ export class TelegramUser implements INodeType {
 		name: 'telegramUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 5,
+		version: 6,
 		description: 'Read Telegram user channels',
 		defaults: {
 			name: 'Telegram User',
@@ -120,6 +128,7 @@ export class TelegramUser implements INodeType {
 				let dialogs = await client.getDialogs({});
 
 				const result = [];
+				let messages = null;
 
 				if (channelName) {
 					let dialog = dialogs.find(
@@ -135,11 +144,13 @@ export class TelegramUser implements INodeType {
 						dialog = dialogs.find(
 							(d) => d.title === channelName || (d.entity as any)?.username === channelName,
 						);
+						if (!dialog) {
+							throw new NodeOperationError(this.getNode(), 'Channel not found');
+						}
+						messages = await getMessages({ client, dialog, isNew: true });
+					} else {
+						messages = await getMessages({ client, dialog });
 					}
-					if (!dialog) {
-						throw new NodeOperationError(this.getNode(), 'Channel not found');
-					}
-					const messages = await getMessages(client, dialog);
 					if (messages) {
 						for (const m of messages) {
 							result.push(m);
@@ -148,7 +159,7 @@ export class TelegramUser implements INodeType {
 				} else {
 					for (let i = 0; i < dialogs.length; i++) {
 						const dialog = dialogs[i];
-						const messages = await getMessages(client, dialog);
+						messages = await getMessages({ client, dialog });
 						if (messages) {
 							for (const m of messages) {
 								result.push(m);
