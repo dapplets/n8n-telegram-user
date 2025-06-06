@@ -5,7 +5,7 @@ import type {
 	INodeTypeDescription,
 } from 'n8n-workflow';
 import { NodeConnectionType, NodeOperationError } from 'n8n-workflow';
-import { TelegramClient } from 'telegram';
+import { Api, TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { Dialog } from 'telegram/tl/custom/dialog';
 
@@ -54,7 +54,7 @@ export class TelegramUser implements INodeType {
 		name: 'telegramUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 4,
+		version: 5,
 		description: 'Read Telegram user channels',
 		defaults: {
 			name: 'Telegram User',
@@ -103,6 +103,10 @@ export class TelegramUser implements INodeType {
 				item = items[itemIndex];
 				channelName = this.getNodeParameter('channelName', itemIndex, '') as string;
 
+				if (/^https:\/\/t.me\//.test(channelName)) {
+					channelName = channelName.replace(/^https:\/\/t.me\//, '');
+				}
+
 				const stringSession = new StringSession(creds.session as string);
 				const client = new TelegramClient(
 					stringSession,
@@ -113,12 +117,25 @@ export class TelegramUser implements INodeType {
 					},
 				);
 				await client.connect();
-				const dialogs = await client.getDialogs({});
+				let dialogs = await client.getDialogs({});
 
 				const result = [];
 
 				if (channelName) {
-					const dialog = dialogs.find((d) => d.title === channelName);
+					let dialog = dialogs.find(
+						(d) => d.title === channelName || (d.entity as any)?.username === channelName,
+					);
+					if (!dialog) {
+						await client.invoke(
+							new Api.channels.JoinChannel({
+								channel: channelName,
+							}),
+						);
+						dialogs = await client.getDialogs({});
+						dialog = dialogs.find(
+							(d) => d.title === channelName || (d.entity as any)?.username === channelName,
+						);
+					}
 					if (!dialog) {
 						throw new NodeOperationError(this.getNode(), 'Channel not found');
 					}
