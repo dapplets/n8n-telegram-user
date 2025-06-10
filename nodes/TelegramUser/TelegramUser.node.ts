@@ -13,27 +13,35 @@ const getMessages = async ({
 	client,
 	dialog,
 	isNew,
+	lastMessageId,
 }: {
 	client: TelegramClient;
 	dialog: Dialog;
 	isNew?: boolean;
+	lastMessageId?: number;
 }) => {
 	let messages = null;
 	if (dialog.entity?.className === 'Channel' || dialog.entity?.className === 'Chat') {
 		let getMore = true;
 		while (getMore) {
 			const rawMessages = await client.getMessages(dialog.entity, {
-				limit: 10,
-				// offsetDate: Math.trunc((Date.now() - 1000 * 60 * 60) / 1000),
+				limit: lastMessageId ? undefined : 10,
+				minId: lastMessageId ? lastMessageId : undefined,
+				offsetDate:
+					lastMessageId || isNew ? undefined : Math.trunc((Date.now() - 1000 * 60 * 60) / 1000),
 			});
 			if (!rawMessages.length) break;
 			if (
+				lastMessageId ||
 				rawMessages[rawMessages.length - 1].date < Math.trunc((Date.now() - 1000 * 60 * 60) / 1000)
 			) {
 				getMore = false;
 			}
 			messages = rawMessages
-				.filter((m) => isNew || m.date >= Math.trunc((Date.now() - 1000 * 60 * 60) / 1000))
+				.filter(
+					(m) =>
+						lastMessageId || isNew || m.date >= Math.trunc((Date.now() - 1000 * 60 * 60) / 1000),
+				)
 				.filter((m) => m.message)
 				.map((m) => ({
 					id: m.id,
@@ -62,7 +70,7 @@ export class TelegramUser implements INodeType {
 		name: 'telegramUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 6,
+		version: 7,
 		description: 'Read Telegram user channels',
 		defaults: {
 			name: 'Telegram User',
@@ -83,6 +91,13 @@ export class TelegramUser implements INodeType {
 				type: 'string',
 				default: '',
 				description: 'Channel Name to get messages from',
+			},
+			{
+				displayName: 'Last Message ID',
+				name: 'lastMessageId',
+				type: 'number',
+				default: '',
+				description: 'Last message ID to get messages from',
 			},
 		],
 	};
@@ -105,11 +120,13 @@ export class TelegramUser implements INodeType {
 
 		let item: INodeExecutionData;
 		let channelName: string;
+		let lastMessageId: number;
 
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {
 				item = items[itemIndex];
 				channelName = this.getNodeParameter('channelName', itemIndex, '') as string;
+				lastMessageId = this.getNodeParameter('lastMessageId', itemIndex, 0) as number;
 
 				if (/^https:\/\/t.me\//.test(channelName)) {
 					channelName = channelName.replace(/^https:\/\/t.me\//, '');
@@ -149,7 +166,7 @@ export class TelegramUser implements INodeType {
 						}
 						messages = await getMessages({ client, dialog, isNew: true });
 					} else {
-						messages = await getMessages({ client, dialog });
+						messages = await getMessages({ client, dialog, lastMessageId });
 					}
 					if (messages) {
 						for (const m of messages) {
