@@ -5,64 +5,9 @@ import type {
 	INodeTypeDescription,
 } from 'n8n-workflow';
 import { NodeConnectionType, NodeOperationError } from 'n8n-workflow';
-import { Api, TelegramClient } from 'telegram';
+import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
-import { Dialog } from 'telegram/tl/custom/dialog';
-
-const getMessages = async ({
-	client,
-	dialog,
-	isNew,
-	lastMessageId,
-}: {
-	client: TelegramClient;
-	dialog: Dialog;
-	isNew?: boolean;
-	lastMessageId?: number;
-}) => {
-	let messages = null;
-	if (dialog.entity?.className === 'Channel' || dialog.entity?.className === 'Chat') {
-		let getMore = true;
-		while (getMore) {
-			const rawMessages = await client.getMessages(dialog.entity, {
-				limit: lastMessageId ? undefined : 10,
-				minId: lastMessageId ? lastMessageId : undefined,
-				offsetDate:
-					lastMessageId || isNew ? undefined : Math.trunc((Date.now() - 1000 * 60 * 60) / 1000),
-			});
-			if (!rawMessages.length) break;
-			if (
-				lastMessageId ||
-				rawMessages[rawMessages.length - 1].date < Math.trunc((Date.now() - 1000 * 60 * 60) / 1000)
-			) {
-				getMore = false;
-			}
-			messages = rawMessages
-				.filter(
-					(m) =>
-						lastMessageId || isNew || m.date >= Math.trunc((Date.now() - 1000 * 60 * 60) / 1000),
-				)
-				.filter((m) => m.message)
-				.map((m) => ({
-					id: m.id,
-					text: m.message,
-					date: m.date,
-					source: dialog.title,
-					sourceId: dialog.id,
-					sourceName: (dialog.entity as any)?.username,
-					sourceType: dialog.isChannel
-						? 'channel'
-						: dialog.isGroup
-							? 'group'
-							: dialog.isUser
-								? 'user'
-								: 'unknown',
-					privateChannel: !!(dialog.entity?.className === 'Channel' && !dialog.entity.username),
-				}));
-		}
-	}
-	return messages;
-};
+import { getMessages } from './get-messages';
 
 export class TelegramUser implements INodeType {
 	description: INodeTypeDescription = {
@@ -70,7 +15,7 @@ export class TelegramUser implements INodeType {
 		name: 'telegramUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 7,
+		version: 8,
 		description: 'Read Telegram user channels',
 		defaults: {
 			name: 'Telegram User',
@@ -96,8 +41,15 @@ export class TelegramUser implements INodeType {
 				displayName: 'Last Message ID',
 				name: 'lastMessageId',
 				type: 'number',
-				default: '',
+				default: 0,
 				description: 'Last message ID to get messages from',
+			},
+			{
+				displayName: 'Is New',
+				name: 'isNew',
+				type: 'boolean',
+				default: false,
+				description: 'Whether the channel is new to the user',
 			},
 		],
 	};
@@ -111,26 +63,15 @@ export class TelegramUser implements INodeType {
 	}
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-		const items = this.getInputData();
 		const creds = await this.getCredentials('telegramUserCredentialsApi');
-
 		if (!creds || !creds.session || !creds.apiId || !creds.apiHash) {
 			throw new NodeOperationError(this.getNode(), 'No credentials got returned!');
 		}
 
-		let item: INodeExecutionData;
-		let channelName: string;
-		let lastMessageId: number;
-
+		const items = this.getInputData();
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {
-				item = items[itemIndex];
-				channelName = this.getNodeParameter('channelName', itemIndex, '') as string;
-				lastMessageId = this.getNodeParameter('lastMessageId', itemIndex, 0) as number;
-
-				if (/^https:\/\/t.me\//.test(channelName)) {
-					channelName = channelName.replace(/^https:\/\/t.me\//, '');
-				}
+				const item = items[itemIndex];
 
 				const stringSession = new StringSession(creds.session as string);
 				const client = new TelegramClient(
@@ -142,49 +83,19 @@ export class TelegramUser implements INodeType {
 					},
 				);
 				await client.connect();
-				let dialogs = await client.getDialogs({});
+				const dialogs = await client.getDialogs({});
 
-				const result = [];
-				let messages = null;
+				const channelName = this.getNodeParameter('channelName', itemIndex, '') as string;
+				const lastMessageId = this.getNodeParameter('lastMessageId', itemIndex, 0) as number;
+				const isNew = this.getNodeParameter('isNew', itemIndex, false) as boolean;
 
-				if (channelName) {
-					let dialog = dialogs.find(
-						(d) => d.title === channelName || (d.entity as any)?.username === channelName,
-					);
-					if (!dialog) {
-						await client.invoke(
-							new Api.channels.JoinChannel({
-								channel: channelName,
-							}),
-						);
-						dialogs = await client.getDialogs({});
-						dialog = dialogs.find(
-							(d) => d.title === channelName || (d.entity as any)?.username === channelName,
-						);
-						if (!dialog) {
-							throw new NodeOperationError(this.getNode(), 'Channel not found');
-						}
-						messages = await getMessages({ client, dialog, isNew: true });
-					} else {
-						messages = await getMessages({ client, dialog, lastMessageId });
-					}
-					if (messages) {
-						for (const m of messages) {
-							result.push(m);
-						}
-					}
-				} else {
-					for (let i = 0; i < dialogs.length; i++) {
-						const dialog = dialogs[i];
-						messages = await getMessages({ client, dialog });
-						if (messages) {
-							for (const m of messages) {
-								result.push(m);
-							}
-						}
-					}
-				}
-				item.json.result = result;
+				item.json.result = await getMessages({
+					client,
+					dialogs,
+					channelName,
+					lastMessageId,
+					isNew,
+				});
 			} catch (error) {
 				if (this.continueOnFail()) {
 					items.push({ json: this.getInputData(itemIndex)[0].json, error, pairedItem: itemIndex });
