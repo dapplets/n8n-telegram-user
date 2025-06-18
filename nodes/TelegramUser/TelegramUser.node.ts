@@ -15,7 +15,7 @@ export class TelegramUser implements INodeType {
 		name: 'telegramUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 8,
+		version: 9,
 		description: 'Read Telegram user channels',
 		defaults: {
 			name: 'Telegram User',
@@ -98,7 +98,7 @@ export class TelegramUser implements INodeType {
 				});
 			} catch (error) {
 				if (this.continueOnFail()) {
-					items.push({ json: this.getInputData(itemIndex)[0].json, error, pairedItem: itemIndex });
+					items.push({ json: this.getInputData(itemIndex)[0], error, pairedItem: itemIndex });
 				} else {
 					if (error.context) {
 						error.context.itemIndex = itemIndex;
