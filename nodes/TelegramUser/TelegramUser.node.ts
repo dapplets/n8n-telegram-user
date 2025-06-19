@@ -15,7 +15,7 @@ export class TelegramUser implements INodeType {
 		name: 'telegramUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 9,
+		version: 10,
 		description: 'Read Telegram user channels',
 		defaults: {
 			name: 'Telegram User',
@@ -68,23 +68,22 @@ export class TelegramUser implements INodeType {
 			throw new NodeOperationError(this.getNode(), 'No credentials got returned!');
 		}
 
+		const stringSession = new StringSession(creds.session as string);
+		const client = new TelegramClient(
+			stringSession,
+			creds.apiId as number,
+			creds.apiHash as string,
+			{
+				connectionRetries: 5,
+			},
+		);
+		await client.connect();
+		const dialogs = await client.getDialogs({});
+
 		const items = this.getInputData();
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+			let item = items[itemIndex];
 			try {
-				const item = items[itemIndex];
-
-				const stringSession = new StringSession(creds.session as string);
-				const client = new TelegramClient(
-					stringSession,
-					creds.apiId as number,
-					creds.apiHash as string,
-					{
-						connectionRetries: 5,
-					},
-				);
-				await client.connect();
-				const dialogs = await client.getDialogs({});
-
 				const channelName = this.getNodeParameter('channelName', itemIndex, '') as string;
 				const lastMessageId = this.getNodeParameter('lastMessageId', itemIndex, 0) as number;
 				const isNew = this.getNodeParameter('isNew', itemIndex, false) as boolean;
@@ -98,7 +97,7 @@ export class TelegramUser implements INodeType {
 				});
 			} catch (error) {
 				if (this.continueOnFail()) {
-					items.push({ json: this.getInputData(itemIndex)[0], error, pairedItem: itemIndex });
+					items.push({ json: item, error, pairedItem: itemIndex });
 				} else {
 					if (error.context) {
 						error.context.itemIndex = itemIndex;
