@@ -15,7 +15,7 @@ export class TelegramUser implements INodeType {
 		name: 'telegramUser',
 		icon: 'file:telegram.svg',
 		group: ['transform'],
-		version: 10,
+		version: 11,
 		description: 'Read Telegram user channels',
 		defaults: {
 			name: 'Telegram User',

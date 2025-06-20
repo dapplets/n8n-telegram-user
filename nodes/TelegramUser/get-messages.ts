@@ -112,7 +112,9 @@ export const getMessages = async ({
 			);
 			dialogs = await client.getDialogs({});
 			dialog = dialogs.find(
-				(d) => d.title === channelName || (d.entity as any)?.username === channelName,
+				(d) =>
+					d.title?.toLowerCase() === channelName.toLowerCase() ||
+					(d.entity as any)?.username?.toLowerCase() === channelName.toLowerCase(),
 			);
 			if (!dialog) {
 				throw new Error('Channel not found');

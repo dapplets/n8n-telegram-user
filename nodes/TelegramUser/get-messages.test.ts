@@ -297,3 +297,12 @@ it('returns messages till the selected message more than the amount limit', asyn
 	});
 	expect(messages).toEqual(twelveReturnedMessages.slice(0, -1));
 });
+
+it('returns messages from a channel with a different letter cases in the name', async () => {
+	const messages = await getMessages({
+		client: mockedClient,
+		dialogs: [mockedDialog],
+		channelName: 'Channel-Name',
+	});
+	expect(messages).toEqual(twelveReturnedMessages.slice(0, 10));
+});
